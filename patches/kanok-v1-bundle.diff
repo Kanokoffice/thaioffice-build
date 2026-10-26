@@ -1,0 +1,85 @@
+--- a/RepositoryModule_host.mk
++++ b/RepositoryModule_host.mk
+@@ -101,6 +101,7 @@
+ 	jurt \
+ 	jvmaccess \
+ 	jvmfwk \
++	kanok \
+ 	$(call gb_Helper_optional,LIBRELOGO,librelogo) \
+ 	libreofficekit \
+ 	lingucomponent \
+--- a/Repository.mk
++++ b/Repository.mk
+@@ -928,6 +928,16 @@
+ $(eval $(call gb_Helper_register_packages_for_install,ooo,\
+ 	tipoftheday_images \
+ ))
++
++# KanokOffice: share/registry/kanok.xcd + default templates (module kanok/)
++$(eval $(call gb_Helper_register_packages_for_install,ooo,\
++	kanok \
++))
++# KanokOffice: TH SarabunPSK + its license in share/fonts/truetype (module kanok/). Listed under ooo, not
++# ooo_fonts: on Windows ooo_fonts files go to the system Fonts folder (style FONT); these stay with the office
++$(eval $(call gb_Helper_register_packages_for_install,ooo,\
++	kanok_fonts \
++))
+ endif
+ 
+ ifneq ($(ENABLE_WASM_STRIP_CANVAS),TRUE)
+--- a/scp2/source/ooo/file_ooo.scp
++++ b/scp2/source/ooo/file_ooo.scp
+@@ -49,6 +49,21 @@
+ 
+ // mod files
+ 
++// KanokOffice: bundled extensions unpacked into share/extensions/ (module kanok/)
++File gid_File_Kanok_Ext_Bedate
++    TXT_FILE_BODY;
++    Styles = (PACKED, FILELIST);
++    Dir = FILELIST_DIR;
++    Name = "kanok-bedate.filelist";
++End
++
++File gid_File_Kanok_Ext_Dict_Th
++    TXT_FILE_BODY;
++    Styles = (PACKED, FILELIST);
++    Dir = FILELIST_DIR;
++    Name = "dict-th-thaioffice.filelist";
++End
++
+ File gid_File_Share_Registry_Main_Xcd
+     TXT_FILE_BODY;
+     Styles = (PACKED, SCPZIP_REPLACE);
+--- a/scp2/source/ooo/module_ooo.scp
++++ b/scp2/source/ooo/module_ooo.scp
+@@ -89,6 +89,8 @@
+              gid_File_Share_Config_Sofficecfg_uiconfig_writerperfect,
+              gid_File_Share_Config_Sofficecfg_uiconfig_xmlsec,
+              gid_File_Share_Registry_Main_Xcd,
++             gid_File_Kanok_Ext_Bedate,
++             gid_File_Kanok_Ext_Dict_Th,
+              gid_File_Extra_Fontunxpsprint,
+              gid_File_Extra_Fontunxafm);
+ End
+--- a/translations/source/th/sfx2/messages.po
++++ b/translations/source/th/sfx2/messages.po
+@@ -1050,7 +1050,7 @@
+ #: include/sfx2/strings.hrc:194
+ msgctxt "STR_WELCOME_LINE1"
+ msgid "Welcome to %PRODUCTNAME!"
+-msgstr ""
++msgstr "ยินดีต้อนรับสู่ กนก ออฟฟิศ!"
+ 
+ #. DVEkR
+ #: include/sfx2/strings.hrc:195
+--- a/instsetoo_native/inc_openoffice/windows/msi_templates/Property.idt
++++ b/instsetoo_native/inc_openoffice/windows/msi_templates/Property.idt
+@@ -47,6 +47,7 @@
+ SecureCustomProperties	NEWPRODUCTS;OLDPRODUCTS;WINMAJORVER;INSTALLLOCATION;TARGETDIR;COMPANYNAME;USERNAME;ALLUSERSPROFILE;USERPROFILE;LANG_SELECTED;APP_SELECTED;FILETYPEDIALOGUSED;SOURCEDIR;ROOTDRIVE;REGISTER_XLW;REGISTER_VST;REGISTER_VSD;CREATEDESKTOPLINK;SELECT_WORD;SELECT_EXCEL;SELECT_POWERPOINT;SELECT_VISIO
+ SetupType	Typical
+ SELECT_WORD	0
++UI_LANGS	en_US,th
+ SELECT_EXCEL	0
+ SELECT_POWERPOINT	0
+ SELECT_VISIO	0

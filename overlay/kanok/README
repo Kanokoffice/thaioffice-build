@@ -1,0 +1,18 @@
+KanokOffice (NALLTC Limited) · module kanok · new directory, not part of LibreOffice
+
+Licenses of the files in this directory:
+
+- Our files (the makefiles, registry/kanok.xcd, template/thai-default.ott,
+  template/thai-default-calc.ots and extensions/kanok-bedate.oxt) are subject to the terms of
+  the Mozilla Public License, v. 2.0. The text files carry the notice themselves; for the two
+  binary templates the notice is here:
+
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- extensions/dict-th-thaioffice.oxt: Thai spelling dictionaries under several licenses;
+  see licenses/README.txt inside the extension.
+- fonts/: TH SarabunPSK 1.000, (c) 2006 DIP & SIPA, included unmodified (file names changed only),
+  under the DIP & SIPA Font License (fonts/DIP-SIPA-Font-License-Agreement.txt, UTF-16 as published).
+  This is not an open-source license and the MPL does not apply to these files.

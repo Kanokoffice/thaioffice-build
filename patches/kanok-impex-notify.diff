@@ -1,0 +1,11 @@
+--- a/sc/source/ui/docshell/impex.cxx	2026-10-23 13:16:08.950022100 +0700
++++ b/sc/source/ui/docshell/impex.cxx	2026-10-23 13:16:08.951022170 +0700
+@@ -279,6 +279,8 @@
+         if (!bHeight)
+             pDocSh->PostPaint( aRange, PaintPartFlags::Grid );
+         pDocSh->SetDocumentModified();
++        // KanokOffice: let XChangesListener extensions see cells pasted via text import
++        HelperNotifyChanges::NotifyIfChangesListeners(*pDocSh, aRange, u"paste"_ustr);
+     }
+     ScTabViewShell* pViewSh = ScTabViewShell::GetActiveViewShell();
+     if ( pViewSh )

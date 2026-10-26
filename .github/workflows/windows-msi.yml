@@ -1,0 +1,472 @@
+# KanokOffice — Windows x64 MSI from the upstream LibreOffice 26.8.1.1 release tarballs + our patches.
+#
+# Manual only (no push trigger): every run costs Actions minutes (Windows x2) in this private repo.
+#   mode=probe  : print runner hardware and disk, ~2 min
+#   mode=build  : full build. If the 6 h job limit is near, make is stopped and the compiler cache
+#                 is saved, so the next build run resumes from cached objects.
+# Artifacts are kept 1 day only (free artifact storage is 500 MB): download, then delete.
+#
+# Toolchain steps follow Ding-Ding-Projects/libreoffice-material .github/workflows/windows-installer.yml.
+
+name: Windows MSI
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe = hardware only · ccache-test = ccache + MSVC check · build = full MSI build"
+        required: true
+        default: probe
+        type: choice
+        options: [probe, ccache-test, build]
+      install_test:
+        description: "After a successful build, install the MSI on a fresh runner"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-msi
+  cancel-in-progress: false
+
+env:
+  LO_VERSION: 26.8.1.1
+  LO_SRC_URL: https://download.documentfoundation.org/libreoffice/src/26.8.1
+
+jobs:
+  probe:
+    if: inputs.mode == 'probe'
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - name: Runner hardware and disk
+        shell: pwsh
+        run: |
+          "ImageOS=$env:ImageOS ImageVersion=$env:ImageVersion"
+          "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
+          $cs = Get-CimInstance Win32_ComputerSystem
+          "RAM GiB: {0:N1}" -f ($cs.TotalPhysicalMemory / 1GB)
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='UsedGiB';e={[math]::Round($_.Used/1GB,1)}}, @{n='FreeGiB';e={[math]::Round($_.Free/1GB,1)}}, Root
+          foreach ($p in 'C:\Android','C:\Program Files\dotnet','C:\hostedtoolcache\windows\CodeQL','C:\vcpkg') {
+            if (Test-Path $p) { "{0}: present" -f $p } else { "{0}: absent" -f $p }
+          }
+
+  ccache-test:
+    if: inputs.mode == 'ccache-test'
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - name: ccache with MSVC, with and without CL=/FS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          curl.exe -fsSL --retry 5 https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-windows-x86_64.zip -o C:\ccache.zip
+          Expand-Archive C:\ccache.zip C:\ccache-x -Force
+          $cc = (Get-ChildItem C:\ccache-x -Recurse -Filter ccache.exe | Select-Object -First 1).FullName
+          & $cc --version | Select-Object -First 1
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          New-Item -ItemType Directory -Force C:\t | Out-Null
+          Set-Content C:\t\t.cpp "#include <utility>`nint main(){return 0;}"
+          foreach ($case in @('CL=/FS', 'no CL')) {
+            Remove-Item C:\t\*.obj -ErrorAction SilentlyContinue
+            $setcl = if ($case -eq 'CL=/FS') { 'set "CL=/FS"' } else { 'set "CL="' }
+            "=== $case"
+            cmd /c "call `"$vcvars`" >nul && $setcl && set "CCACHE_DIR=C:\t\cc" && set "CCACHE_LOGFILE=C:\t\log-$($case -replace '\W','').txt" && cd /d C:\t && `"$cc`" cl -nologo -c t.cpp & echo rc=%errorlevel% & dir /b *.obj & `"$cc`" cl -nologo -c t.cpp & echo rc2=%errorlevel% & `"$cc`" -s"
+            Get-Content "C:\t\log-$($case -replace '\W','').txt" -ErrorAction SilentlyContinue | Select-String -Pattern 'unsupported|Failed|error|Result|fall' | Select-Object -First 15 | ForEach-Object Line
+          }
+
+  build:
+    if: inputs.mode == 'build'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      msi_found: ${{ steps.stage.outputs.msi_found }}
+    env:
+      # No CL=/FS (the reference workflow sets it): ccache 4.14 treats a set CL as unsupported and then
+      # exits 0 without producing an object file. That broke configure (run 39930363704) and, when set only
+      # for the cppunit make call, the build tools compiled in the same call (run 39936536262).
+      CCACHE_MAXSIZE: 7G
+    steps:
+      - name: Record job start
+        shell: bash
+        run: echo "JOB_START=$(date +%s)" >> "$(cygpath -u "$GITHUB_ENV")"
+
+      - name: Force an LF checkout
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Report hardware, reclaim disk, pick build drive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
+          "RAM GiB: {0:N1}" -f ((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free, Root
+          # Always D:\lo. The compiler cache path (and so the cache version) contains the drive, and C:
+          # compiles ~1.4x slower: round 2 picked C: by free space, missed round 1's D: cache and timed out.
+          # Checked before the slow cleanup below so a bad runner fails in minutes, not hours.
+          $drive = Get-PSDrive -Name D -PSProvider FileSystem -ErrorAction SilentlyContinue
+          if (-not $drive) { throw 'No D: drive on this runner; refusing to build on C: (cache miss + slow disk).' }
+          $root = 'D:\lo'
+          Write-Host ("Build root {0} ({1:N1} GiB free)" -f $root, ($drive.Free / 1GB))
+          if ($drive.Free -lt 30GB) { throw 'Fewer than 30 GiB free on D:; refusing to build on C: (cache miss + slow disk).' }
+          foreach ($path in 'C:\Android','C:\Program Files\dotnet','C:\hostedtoolcache\windows\CodeQL','C:\vcpkg') {
+            if (Test-Path -LiteralPath $path) {
+              Write-Host "Removing unused runner payload: $path"
+              try { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop }
+              catch { Write-Warning "Could not fully remove ${path}: $($_.Exception.Message)" }
+            }
+          }
+          New-Item -ItemType Directory -Force -Path "$root\tarballs","$root\ccache","$root\dl","$root\out","$root\diag" | Out-Null
+          "LO_ROOT=$root" >> $env:GITHUB_ENV
+          "CCACHE_DIR=$root\ccache" >> $env:GITHUB_ENV
+          "BUILD_JOBS=$env:NUMBER_OF_PROCESSORS" >> $env:GITHUB_ENV
+
+      - name: Validate Visual Studio 2022 and Windows SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -version '[17.0,18.0)' -products '*' -requires `
+            Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            Microsoft.VisualStudio.Component.VC.ATL `
+            Microsoft.VisualStudio.Component.VC.Redist.MSM `
+            -property installationPath
+          if (-not $vs) { throw 'Visual Studio 2022 with MSVC x64, ATL and CRT merge modules was not found.' }
+          Write-Host "Visual Studio: $vs"
+          $kitsRoot = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots').KitsRoot10
+          Get-ChildItem -LiteralPath (Join-Path $kitsRoot 'bin') -Directory | Where-Object Name -match '^10\.' | ForEach-Object Name
+
+      - name: Restore external source tarballs
+        id: ext-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.LO_ROOT }}\tarballs
+          key: win-ext-tarballs-${{ env.LO_VERSION }}
+          restore-keys: win-ext-tarballs-
+
+      - name: Restore compiler cache
+        id: cc-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.LO_ROOT }}\ccache
+          key: win-ccache-${{ env.LO_VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: win-ccache-${{ env.LO_VERSION }}-
+
+      - name: Install Cygwin, LibreOffice make/pkgconf, ccache
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = 'C:\cygwin-setup.exe'
+          curl.exe -fL --retry 8 --retry-delay 15 --retry-all-errors --connect-timeout 30 https://cygwin.com/setup-x86_64.exe -o $setup
+          if ($LASTEXITCODE -ne 0) { throw 'Cygwin installer download failed.' }
+          $sig = Get-AuthenticodeSignature -LiteralPath $setup
+          Write-Host "Cygwin setup signature: $($sig.Status) / $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw 'The Cygwin installer signature is not valid.' }
+          $packages = @(
+            'autoconf','automake','bison','cabextract','diffutils','file','flex','gawk','gettext-devel',
+            'git','gperf','libxml2-devel','libxslt','make','nasm','patch','perl','perl-Archive-Zip',
+            'perl-Font-TTF','perl-IO-String','pkg-config','python3','rsync','tar','unzip','wget','which',
+            'xz','zip'
+          ) -join ','
+          $p = Start-Process -FilePath $setup -WindowStyle Hidden -Wait -PassThru -ArgumentList @(
+            '-q','-n','-N','-d','-R','C:\cygwin64','-s','https://mirrors.kernel.org/sourceware/cygwin/','-P',$packages)
+          if ($p.ExitCode -ne 0) { throw "Cygwin setup failed with exit code $($p.ExitCode)." }
+
+          $toolDir = 'C:\cygwin64\opt\lo\bin'
+          New-Item -ItemType Directory -Force -Path $toolDir | Out-Null
+          $downloads = @{
+            'make.exe'          = 'https://dev-www.libreoffice.org/bin/cygwin/make-4.2.1-msvc.exe'
+            'pkgconf-2.4.3.exe' = 'https://dev-www.libreoffice.org/extern/pkgconf-2.4.3.exe'
+          }
+          foreach ($e in $downloads.GetEnumerator()) {
+            $dst = Join-Path $toolDir $e.Key
+            curl.exe -fL --retry 5 --retry-delay 5 $e.Value -o $dst
+            if ($LASTEXITCODE -ne 0 -or (Get-Item -LiteralPath $dst).Length -lt 10000) { throw "Downloading $($e.Key) failed." }
+            Write-Host "$($e.Key) SHA-256 $((Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash)"
+          }
+
+          # Native ccache with MSVC support; configure looks for /opt/lo/bin/ccache.exe first.
+          $zip = 'C:\ccache.zip'
+          curl.exe -fL --retry 5 https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-windows-x86_64.zip -o $zip
+          $h = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne '6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84') { throw "ccache zip hash mismatch: $h" }
+          Expand-Archive -LiteralPath $zip -DestinationPath C:\ccache-x -Force
+          Copy-Item (Get-ChildItem C:\ccache-x -Recurse -Filter ccache.exe | Select-Object -First 1).FullName "$toolDir\ccache.exe"
+
+          Copy-Item C:\cygwin64\bin\bash.exe C:\cygwin64\bin\cygbash.exe -Force
+          'C:\cygwin64\bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Download and verify upstream source
+        shell: cygbash --noprofile --norc -o igncr -eo pipefail {0}
+        run: |
+          export PATH="/opt/lo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+          ws="$(cygpath -u "$GITHUB_WORKSPACE")"
+          dl="$(cygpath -u "$LO_ROOT")/dl"
+          cd "$dl"
+          for f in libreoffice-$LO_VERSION.tar.xz libreoffice-translations-$LO_VERSION.tar.xz; do
+            curl -fL --retry 8 --retry-delay 15 --retry-all-errors --connect-timeout 30 -o "$f" "$LO_SRC_URL/$f"
+          done
+          sha256sum -c "$ws/build/upstream.sha256"
+
+      - name: Unpack, patch, overlay
+        shell: cygbash --noprofile --norc -o igncr -eo pipefail {0}
+        run: |
+          export PATH="/opt/lo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+          ws="$(cygpath -u "$GITHUB_WORKSPACE")"
+          root="$(cygpath -u "$LO_ROOT")"
+          cd "$root"
+          tar -xJf dl/libreoffice-$LO_VERSION.tar.xz
+          tar -xJf dl/libreoffice-translations-$LO_VERSION.tar.xz
+          rm -rf dl
+          cd "libreoffice-$LO_VERSION"
+          # translations are already unpacked into translations/ (our patches edit them). Without this
+          # directory, make's get-submodules re-downloads the tarball and Cygwin tar fails on the C:/ path.
+          mkdir -p "src/libreoffice-translations-$LO_VERSION"
+          while read -r p; do
+            [ -n "$p" ] || continue
+            echo "== patch $p"
+            patch -p1 --no-backup-if-mismatch < "$ws/patches/$p"
+          done < "$ws/patches/series"
+          # Windows edition of the notices (kanok-v1-license.diff): make-notices.py --windows leaves @BUILD_DATE@
+          tpn=readlicense_oo/license/THIRD-PARTY-NOTICES-windows
+          sed -i "s/@BUILD_DATE@/$(date -u +%Y-%m-%d)/" "$tpn"
+          if grep -q '@BUILD_DATE@' "$tpn" || ! grep -q 'Windows Installer package for x86-64, built 20' "$tpn"; then
+            echo "THIRD-PARTY-NOTICES-windows: build date not filled in"; exit 1
+          fi
+          grep -m1 'Windows Installer package' "$tpn"
+          # 54 overlay targets are symlinks upstream: replace the link, do not write through it.
+          # -R, not -a: Cygwin cannot preserve NTFS directory permissions here (run 39928738011 failed on that)
+          cp -R --remove-destination "$ws/overlay/." .
+          n=0; bad=0
+          while IFS= read -r -d '' f; do
+            rel="${f#$ws/overlay/}"; n=$((n+1))
+            if [ -L "$rel" ] || ! cmp -s "$f" "$rel"; then echo "MISMATCH $rel"; bad=$((bad+1)); fi
+          done < <(find "$ws/overlay" -type f -print0)
+          echo "overlay files checked=$n mismatched=$bad"
+          [ "$bad" = 0 ]
+          # TH SarabunPSK (module kanok): the files as received, byte for byte (DIP & SIPA license terms 2-3, legal review §15.20)
+          printf '%s\n' \
+            '2936ea292bf2b82c572ed50837dc4a04170076b561bbfc5a9306037a989b470a  THSarabun.ttf' \
+            '969fe7493a68f136dab33f51fabcbcaa44fe040582bec1a575e707f1850eb06c  THSarabun-Bold.ttf' \
+            '9fd6e9672f5a78edf186591b8a9f376b8c27d0aac37875f818670a075995cec9  THSarabun-Italic.ttf' \
+            'd52e0c8a058afc18f45c50b90f48de5954a46c0868ac826932ba5248b128ffc0  THSarabun-BoldItalic.ttf' \
+            'f7a2fc4da4010c59c03df9dc17a8e44ff4860916a9a82f1bde8c929887821a31  DIP-SIPA-Font-License-Agreement.txt' \
+            | (cd kanok/fonts && sha256sum -c --strict -)
+          echo "symlinks left in tree: $(find . -type l | wc -l)"; find . -type l
+          rm -rf "$root/branding"; cp -R "$ws/branding" "$root/branding"
+
+      - name: Configure
+        shell: cygbash --noprofile --norc -o igncr -eo pipefail {0}
+        run: |
+          export PATH="/opt/lo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+          ws="$(cygpath -u "$GITHUB_WORKSPACE")"
+          root="$(cygpath -u "$LO_ROOT")"
+          ext="$(cygpath -m "$LO_ROOT")/tarballs"
+          brand="$(cygpath -m "$LO_ROOT")/branding"
+          mapfile -t opts < <(grep -v '^[[:space:]]*#' "$ws/build/configure-windows.txt" | sed -e '/^[[:space:]]*$/d' \
+            -e "s|@EXT_TAR@|$ext|" -e "s|@BRANDING@|$brand|")
+          opts+=("--with-parallelism=$BUILD_JOBS")
+          printf 'option: %s\n' "${opts[@]}"
+          cd "$root/libreoffice-$LO_VERSION"
+          mkdir -p "$HOME"
+          ./autogen.sh "${opts[@]}"
+          grep -E '^export (CCACHE|ENABLE_CLI|WITH_LANG|PRODUCTNAME|OOO_VENDOR|ENABLE_PCH)=' config_host.mk || true
+          /opt/lo/bin/ccache.exe -s || true
+          echo "CONFIGURED_AT=$(date +%s)" >> "$(cygpath -u "$GITHUB_ENV")"
+
+      - name: Build (stops itself before the job limit)
+        id: make
+        shell: cygbash --noprofile --norc -o igncr -eo pipefail {0}
+        run: |
+          export PATH="/opt/lo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+          root="$(cygpath -u "$LO_ROOT")"
+          cd "$root/libreoffice-$LO_VERSION"
+          # job limit 355 min; keep 30 min for saving the compiler cache, staging and uploads
+          left=$(( 355*60 - ($(date +%s) - JOB_START) - 30*60 ))
+          echo "make time budget: $((left/60)) min"
+          rc=0
+          timeout -k 120 "$left" bash -o pipefail -c \
+            "/opt/lo/bin/make.exe -j$BUILD_JOBS build" \
+            > "$root/diag/make.log" 2>&1 || rc=$?
+          echo "make rc=$rc elapsed=$(( ($(date +%s) - CONFIGURED_AT) / 60 )) min"
+          tail -n 60 "$root/diag/make.log"
+          echo "MAKE_RC=$rc" >> "$(cygpath -u "$GITHUB_ENV")"
+          exit $rc
+
+      - name: Compiler cache statistics
+        if: always()
+        shell: cygbash --noprofile --norc -o igncr -eo pipefail {0}
+        run: /opt/lo/bin/ccache.exe -s -v | tee "$(cygpath -u "$LO_ROOT")/diag/ccache-stats.txt" || true
+
+      - name: Save compiler cache
+        if: always() && steps.make.outcome != 'skipped' && steps.cc-cache.outcome == 'success'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LO_ROOT }}\ccache
+          key: win-ccache-${{ env.LO_VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save external source tarballs
+        if: always() && steps.make.outcome != 'skipped' && steps.ext-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LO_ROOT }}\tarballs
+          key: win-ext-tarballs-${{ env.LO_VERSION }}
+
+      - name: Stage and check MSI
+        id: stage
+        if: always()
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:LO_ROOT "libreoffice-$env:LO_VERSION"
+          $msi = @(Get-ChildItem -Path (Join-Path $src 'workdir\installation') -Recurse -Filter *.msi -ErrorAction SilentlyContinue)
+          if ($msi.Count -eq 0) { "msi_found=false" >> $env:GITHUB_OUTPUT; Write-Host 'No MSI produced.'; exit 0 }
+          $out = Join-Path $env:LO_ROOT 'out'
+          # Only the largest MSI is the installer; the small per-language ones are intermediates
+          # (round 1 had two different kanokoffice268_en-US.msi, so copying all of them overwrote one)
+          $instRoot = Join-Path $src 'workdir\installation'
+          foreach ($m in $msi) { "found: {0}  {1} bytes" -f $m.FullName.Substring($instRoot.Length), $m.Length }
+          $main = $msi | Sort-Object Length -Descending | Select-Object -First 1
+          Copy-Item $main.FullName $out
+          $h = (Get-FileHash $main.FullName -Algorithm SHA256).Hash.ToLower()
+          "{0}  {1}" -f $h, $main.Name | Set-Content (Join-Path $out 'SHA256SUMS.txt')
+          "staged: $($main.Name)  $($main.Length) bytes  sha256 $h"
+          # Administrative install = unpack files without installing; check the payload
+          $adm = Join-Path $env:LO_ROOT 'admin'
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/a', "`"$($main.FullName)`"", '/qn', "TARGETDIR=`"$adm`"")
+          "admin-install exit=$($p.ExitCode)"
+          $files = @(Get-ChildItem $adm -Recurse -File)
+          "payload files: $($files.Count)"
+          foreach ($n in 'soffice.exe','soffice.com','THIRD-PARTY-NOTICES','NOTICE') {
+            $f = $files | Where-Object Name -eq $n | Select-Object -First 1
+            "{0}: {1}" -f $n, ($(if ($f) { $f.FullName.Substring($adm.Length) } else { 'MISSING' }))
+          }
+          $tpn = $files | Where-Object Name -eq 'THIRD-PARTY-NOTICES' | Select-Object -First 1
+          if ($tpn) { "THIRD-PARTY-NOTICES edition: $((Select-String -Path $tpn.FullName -Pattern 'Windows Installer package|Linux \.deb packages' | Select-Object -First 1).Line)" }
+          "LiberationSansNarrow files: $(@($files | Where-Object Name -like 'LiberationSansNarrow*').Count)"
+          "Thai UI resource files (*th*.mo under resource\th): $(@($files | Where-Object { $_.FullName -match '\\resource\\th\\' }).Count)"
+          "msi_found=true" >> $env:GITHUB_OUTPUT
+
+      - name: Upload MSI (1 day)
+        if: always() && steps.stage.outputs.msi_found == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: kanok-msi
+          path: ${{ env.LO_ROOT }}\out
+          retention-days: 1
+          compression-level: 0
+
+      - name: Collect diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:LO_ROOT "libreoffice-$env:LO_VERSION"
+          $diag = Join-Path $env:LO_ROOT 'diag'
+          foreach ($n in 'config.log','autogen.lastrun','config_host.mk') {
+            $f = Join-Path $src $n; if (Test-Path $f) { Copy-Item $f $diag }
+          }
+          $log = Join-Path $diag 'make.log'
+          if (Test-Path $log) {
+            Get-Content $log -Tail 4000 | Set-Content (Join-Path $diag 'make-tail.log')
+            Select-String -Path $log -Pattern 'error|Error' -SimpleMatch:$false | Select-Object -Last 300 |
+              ForEach-Object Line | Set-Content (Join-Path $diag 'make-errors.log')
+            Remove-Item $log
+          }
+          "job minutes so far: {0:N0}" -f (((Get-Date) - [DateTimeOffset]::FromUnixTimeSeconds([int64]$env:JOB_START).LocalDateTime).TotalMinutes) |
+            Tee-Object (Join-Path $diag 'timing.txt')
+
+      - name: Upload diagnostics (1 day)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kanok-diag
+          path: ${{ env.LO_ROOT }}\diag
+          retention-days: 1
+
+  install-test:
+    needs: build
+    if: inputs.install_test && needs.build.outputs.msi_found == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 15  # round 1 took 3.6 min; keeps worst case of a build+install run at 355+15 = 370
+    steps:
+      - name: Check out the install check script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: build
+      - uses: actions/download-artifact@v8
+        with:
+          name: kanok-msi
+          path: msi
+      - name: Install on a fresh runner and convert a Thai document
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          $m = Get-ChildItem msi -Filter *.msi | Sort-Object Length -Descending | Select-Object -First 1
+          "MSI: $($m.Name) $($m.Length) bytes"
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', "`"$($m.FullName)`"", '/qn', '/norestart', '/l*v', "`"$PWD\out\install.log`"")
+          "install exit=$($p.ExitCode) seconds=$([int]$sw.Elapsed.TotalSeconds)"
+          $com = Get-ChildItem 'C:\Program Files' -Recurse -Filter soffice.com -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $com) { throw 'soffice.com not found after install' }
+          "installed at: $($com.DirectoryName)"
+          & $com.FullName --version | Tee-Object out\version.txt
+          [IO.File]::WriteAllText("$PWD\out\thai.txt", "กนก ออฟฟิศ ทดสอบภาษาไทย 23/10/2569`r`n", [Text.UTF8Encoding]::new($true))
+          & $com.FullName --headless --convert-to pdf --outdir out out\thai.txt | Tee-Object out\convert.txt
+          if (Test-Path out\thai.pdf) { "pdf bytes: $((Get-Item out\thai.pdf).Length)" } else { throw 'conversion produced no PDF' }
+          Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
+            Where-Object DisplayName -like '*Kanok*' | Select-Object DisplayName, DisplayVersion, Publisher | Format-List | Tee-Object out\uninstall-entry.txt
+      - name: Check Thai defaults, default templates and bundled extensions (kanok module)
+        shell: pwsh
+        run: |
+          $dir = (Get-ChildItem 'C:\Program Files' -Recurse -Filter soffice.com -ErrorAction SilentlyContinue | Select-Object -First 1).DirectoryName
+          # Thai UI language pack installed on this English Windows (default UI_LANGS=en_US,th in Property.idt)
+          $th = Select-String -Path out\install.log -Pattern 'Feature: gm_Langpack_r_th;' | Select-Object -First 1
+          "Thai UI langpack feature: $($th.Line)" | Tee-Object out\langpack-th.txt
+          $thLocal = [bool]($th -and $th.Line -match 'Action: Local')
+          # Thai welcome line in the Start Center (STR_WELCOME_LINE1)
+          $mo = [IO.File]::ReadAllBytes("$dir\resource\th\LC_MESSAGES\sfx.mo")
+          $want = [Text.Encoding]::UTF8.GetBytes('ยินดีต้อนรับสู่ กนก ออฟฟิศ!')
+          $hex = [BitConverter]::ToString($mo); $found = $hex.Contains([BitConverter]::ToString($want))
+          "Thai welcome string in sfx.mo: $found" | Tee-Object out\welcome.txt
+          # bundled Python without pip/setuptools (kanok-v1-nopip.diff); no python-core at all counts as a failure, not a pass
+          $core = @(Get-ChildItem $dir -Directory -Filter 'python-core-*')
+          $left = @(foreach ($c in $core) { foreach ($m in 'pip','setuptools','ensurepip','pkg_resources','_distutils_hack') { if (Test-Path (Join-Path $c.FullName "lib\$m")) { "$($c.Name)\lib\$m" } } })
+          $noPip = ($core.Count -eq 1) -and ($left.Count -eq 0)
+          "python-core dirs: $($core.Count) (want 1) · pip/setuptools dirs left: $($left -join ', ')" | Tee-Object out\no-pip.txt
+          # TH SarabunPSK installed byte for byte next to its license (module kanok, legal review §15.20 F-3)
+          $sarabun = @{ 'THSarabun.ttf' = '2936ea292bf2b82c572ed50837dc4a04170076b561bbfc5a9306037a989b470a'; 'THSarabun-Bold.ttf' = '969fe7493a68f136dab33f51fabcbcaa44fe040582bec1a575e707f1850eb06c';
+                     'THSarabun-Italic.ttf' = '9fd6e9672f5a78edf186591b8a9f376b8c27d0aac37875f818670a075995cec9'; 'THSarabun-BoldItalic.ttf' = 'd52e0c8a058afc18f45c50b90f48de5954a46c0868ac826932ba5248b128ffc0';
+                     'DIP-SIPA-Font-License-Agreement.txt' = 'f7a2fc4da4010c59c03df9dc17a8e44ff4860916a9a82f1bde8c929887821a31' }
+          $fontsOk = $true
+          foreach ($k in $sarabun.Keys) {
+            $f = Join-Path $dir "..\share\fonts\truetype\$k"
+            $h = if (Test-Path $f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLower() } else { 'missing' }
+            if ($h -ne $sarabun[$k]) { $fontsOk = $false }
+            "$k $h $(if ($h -eq $sarabun[$k]) {'ok'} else {'FAIL'})" | Tee-Object -Append out\fonts-sarabun.txt
+          }
+          # office on a UNO pipe, then the same check script as on Linux (office's own Python)
+          $so = Start-Process "$dir\soffice.exe" -PassThru -ArgumentList @('--headless', '--norestore', '"--accept=pipe,name=kanokcheck;urp;"')
+          & "$dir\python.exe" "$env:GITHUB_WORKSPACE\build\check-install.py" kanokcheck 2>&1 | Tee-Object out\check-install.txt
+          $rc = $LASTEXITCODE
+          Start-Sleep 5
+          Get-Process soffice* -ErrorAction SilentlyContinue | Stop-Process -Force
+          & "$dir\unopkg.com" list --bundled 2>&1 | Tee-Object out\unopkg-bundled.txt
+          $n = @(Select-String -Path out\unopkg-bundled.txt -Pattern '^Identifier:').Count
+          "bundled extensions: $n (want 2)" | Tee-Object -Append out\unopkg-bundled.txt
+          if ($rc -ne 0 -or $n -ne 2 -or -not $found -or -not $thLocal -or -not $noPip -or -not $fontsOk) { throw "kanok checks failed: check-install rc=$rc, bundled=$n, welcome=$found, th-langpack=$thLocal, no-pip=$noPip, sarabun-files=$fontsOk" }
+      - name: Upload install test results (1 day)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kanok-install-test
+          path: out
+          retention-days: 1

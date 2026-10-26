@@ -1,0 +1,41 @@
+# KanokOffice Windows x64 configure options — one option per line, '#' starts a comment line.
+# @EXT_TAR@ and @BRANDING@ are replaced by the workflow with mixed-style paths (C:/...).
+#
+# Same product options as the Linux release (kanok-source-v1 build/autogen.input):
+--with-lang=en-US th
+--enable-mpl-subset
+--disable-poppler
+--disable-postgresql-sdbc
+--disable-report-builder
+--disable-lotuswordpro
+--disable-lpsolve
+--with-theme=colibre colibre_dark
+--without-java
+--without-help
+--without-doxygen
+--disable-online-update
+--enable-release-build
+--with-product-name=KanokOffice
+--with-vendor=NALLTC Limited
+--with-branding=@BRANDING@
+--with-external-tar=@EXT_TAR@
+#
+# Windows toolchain and MSI (as in Ding-Ding-Projects/libreoffice-material windows-installer.yml):
+--host=x86_64-pc-cygwin
+--with-visual-studio=2022
+--with-windows-sdk=10.0
+--with-package-format=msi
+--enable-python=fully-internal
+--without-junit
+--without-dotnet
+--without-helppack-integration
+--enable-database-connectivity
+#
+# Differences from the Linux release, taken from the same reference to lower the risk of a failed run
+# (PDFium stays enabled as on Linux: with Poppler disabled, configure requires it for PDF import):
+--disable-odk
+--disable-cairo-canvas
+--with-galleries=no
+#
+# Compiler cache: lets a run that hits the 6 h job limit resume in the next run (cache saved by the workflow)
+--enable-ccache

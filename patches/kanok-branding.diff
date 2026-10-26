@@ -1,0 +1,378 @@
+--- a/cui/uiconfig/ui/aboutdialog.ui
++++ b/cui/uiconfig/ui/aboutdialog.ui
+@@ -157,7 +157,7 @@
+                     <property name="receives-default">True</property>
+                     <property name="relief">none</property>
+                     <property name="xalign">0</property>
+-                    <property name="uri">https://www.libreoffice.org/</property>
++                    <property name="uri">https://kanokoffice.com/</property>
+                   </object>
+                   <packing>
+                     <property name="expand">False</property>
+--- a/instsetoo_native/util/openoffice.lst.in
++++ b/instsetoo_native/util/openoffice.lst.in
+@@ -8,13 +8,13 @@
+             UREPACKAGEVERSION @LIBO_VERSION_MAJOR@.@LIBO_VERSION_MINOR@.@LIBO_VERSION_MICRO@.@LIBO_VERSION_PATCH@@LIBO_VERSION_SUFFIX@
+             URELAYERVERSION 1
+             REFERENCEOOOMAJORMINOR 4.1
+-            WINDOWSBASISROOTNAME LibreOffice
+-            UNIXBASISROOTNAME libreoffice@LIBO_VERSION_MAJOR@.@LIBO_VERSION_MINOR@
++            WINDOWSBASISROOTNAME KanokOffice
++            UNIXBASISROOTNAME kanokoffice@LIBO_VERSION_MAJOR@.@LIBO_VERSION_MINOR@
+             HIDELICENSEDIALOG 1
+             PACKAGEPREFIX
+-            BASISPACKAGEPREFIX libobasis
+-            UREPACKAGEPREFIX libreoffice
+-            SOLSUREPACKAGEPREFIX libreoffice
++            BASISPACKAGEPREFIX kanokbasis
++            UREPACKAGEPREFIX kanokoffice
++            SOLSUREPACKAGEPREFIX kanokoffice
+             PROGRESSBARCOLOR 0,0,0
+             PROGRESSFRAMECOLOR 102,102,102
+             PROGRESSPOSITION 30,145
+@@ -37,7 +37,7 @@
+     }
+ }
+ 
+-LibreOffice
++KanokOffice
+ {
+     Settings
+     {
+@@ -51,7 +51,8 @@
+             BRANDPACKAGEVERSION @LIBO_VERSION_MAJOR@.@LIBO_VERSION_MINOR@
+             USERDIRPRODUCTVERSION 4
+             BASEPRODUCTVERSION @LIBO_VERSION_MAJOR@.@LIBO_VERSION_MINOR@
+-            UPDATEURL https://update.libreoffice.org/check.php
++            UPDATEURL
++            CODEFILENAME codes_kanok.txt
+             ADD_INCLUDE_FILES cli_ure/version/version.txt,unoil/climaker/version.txt
+             ADDSYSTEMINTEGRATION 1
+             PACKAGEVERSION @LIBO_VERSION_MAJOR@.@LIBO_VERSION_MINOR@.@LIBO_VERSION_MICRO@.@LIBO_VERSION_PATCH@@LIBO_VERSION_SUFFIX@
+@@ -66,9 +67,9 @@
+         active          1
+         compression     5
+         script          setup_osl
+-        downloadname    LibreOffice_{productversion}_{os}_install_{languages}
+-        langpackdownloadname    LibreOffice_{productversion}_languagepack_{os}_install_{languages}
+-        helppackdownloadname    LibreOffice_{productversion}_helppack_{os}_install_{languages}
++        downloadname    KanokOffice_{productversion}_{os}_install_{languages}
++        langpackdownloadname    KanokOffice_{productversion}_languagepack_{os}_install_{languages}
++        helppackdownloadname    KanokOffice_{productversion}_helppack_{os}_install_{languages}
+         include         {installscriptdir},{customtargetpath}/readlicense_oo/readme,{customtargetpath}/sysui/{pkgtype},{customtargetpath}/setup_native,{filelistpath}/PackageSet,{filelistpath}/GeneratedPackage,{filelistpath}/Package,{filelistpath}/ExtensionPackage,{filelistpath}/CustomTarget/helpcontent2/help3xsl/filelists,{extensionsdir},{licensepath},{packinfopath}
+     }
+ }
+@@ -118,7 +119,7 @@
+     }
+ }
+ 
+-LibreOffice_SDK
++KanokOffice_SDK
+ {
+     Settings
+     {
+--- a/officecfg/registry/data/org/openoffice/Office/UI/GenericCommands.xcu
++++ b/officecfg/registry/data/org/openoffice/Office/UI/GenericCommands.xcu
+@@ -5796,7 +5796,7 @@
+       </node>
+       <node oor:name=".uno:Donation" oor:op="replace">
+         <prop oor:name="Label" oor:type="xs:string">
+-          <value xml:lang="en-US">Donate to LibreOffice</value>
++          <value xml:lang="en-US">Support KanokOffice</value>
+         </prop>
+         <prop oor:name="Properties" oor:type="xs:int">
+           <value>1</value>
+--- a/scp2/source/ooo/folderitem_ooo.ulf
++++ b/scp2/source/ooo/folderitem_ooo.ulf
+@@ -26,4 +26,4 @@
+ en-US = "%PRODUCTNAME (Troubleshoot Mode)"
+ 
+ [STR_FI_TOOLTIP_SOFFICE]
+-en-US = "LibreOffice, the office productivity suite provided by The Document Foundation. See https://www.documentfoundation.org"
++en-US = "KanokOffice, an office suite based on LibreOffice. See https://kanokoffice.com/"
+--- a/scp2/source/ooo/registryitem_ooo.scp
++++ b/scp2/source/ooo/registryitem_ooo.scp
+@@ -208,7 +208,7 @@
+     ModuleID = gid_Module_Root;
+     Subkey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\%PRODUCTNAME %PRODUCTVERSION";
+     Name = "HelpLink";
+-    Value = "http://www.libreoffice.org";
++    Value = "https://kanokoffice.com/";
+ End
+ 
+ RegistryItem gid_Regitem_Software_Microsoft_Windows_Currentversion_Uninstall_Staroffice_Modifypath
+@@ -224,7 +224,7 @@
+     ModuleID = gid_Module_Root;
+     Subkey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\%PRODUCTNAME %PRODUCTVERSION";
+     Name = "Publisher";
+-    Value = "The Document Foundation for the LibreOffice Community";
++    Value = "NALLTC Limited";
+ End
+ 
+ RegistryItem gid_Regitem_Software_Microsoft_Windows_Currentversion_Uninstall_Staroffice_Uninstallstring
+@@ -240,7 +240,7 @@
+     ModuleID = gid_Module_Root;
+     Subkey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\%PRODUCTNAME %PRODUCTVERSION";
+     Name = "URLInfoAbout";
+-    Value = "http://www.libreoffice.org/";
++    Value = "https://kanokoffice.com/";
+ End
+ 
+ RegistryItem gid_Regitem_Software_Microsoft_Windows_Currentversion_Uninstall_Staroffice_Urlupdateinfo
+@@ -248,7 +248,7 @@
+     ModuleID = gid_Module_Root;
+     Subkey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\%PRODUCTNAME %PRODUCTVERSION";
+     Name = "URLUpdateInfo";
+-    Value = "http://download.libreoffice.org";
++    Value = "https://kanokoffice.com/";
+ End
+ 
+ RegistryItem gid_Regitem_Software_Openoffice_Productname_Productversion_Path
+--- a/scp2/source/ooo/registryitem_ooo.ulf
++++ b/scp2/source/ooo/registryitem_ooo.ulf
+@@ -26,4 +26,4 @@
+ en-US = "%PRODUCTNAME Extension"
+ 
+ [STR_REG_VAL_APPCAPABILITY_DESCRIPTION_OOO]
+-en-US = "LibreOffice"
++en-US = "KanokOffice"
+--- a/sysui/desktop/menus/base.desktop
++++ b/sysui/desktop/menus/base.desktop
+@@ -30,7 +30,7 @@
+ X-GIO-NoFuse=true
+ Keywords=Data;SQL;
+ InitialPreference=5
+-StartupWMClass=libreoffice-base
++StartupWMClass=kanokoffice-base
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ Actions=NewDocument;
+--- a/sysui/desktop/menus/calc.desktop
++++ b/sysui/desktop/menus/calc.desktop
+@@ -30,7 +30,7 @@
+ X-GIO-NoFuse=true
+ Keywords=Accounting;Stats;OpenDocument Spreadsheet;Chart;Microsoft Excel;Microsoft Works;OpenOffice Calc;ods;xls;xlsx;
+ InitialPreference=5
+-StartupWMClass=libreoffice-calc
++StartupWMClass=kanokoffice-calc
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ Actions=NewDocument;
+--- a/sysui/desktop/menus/draw.desktop
++++ b/sysui/desktop/menus/draw.desktop
+@@ -30,7 +30,7 @@
+ X-GIO-NoFuse=true
+ Keywords=Vector;Schema;Diagram;Layout;OpenDocument Graphics;Microsoft Publisher;Microsoft Visio;Corel Draw;cdr;odg;svg;pdf;vsd;
+ InitialPreference=5
+-StartupWMClass=libreoffice-draw
++StartupWMClass=kanokoffice-draw
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ Actions=NewDocument;
+--- a/sysui/desktop/menus/impress.desktop
++++ b/sysui/desktop/menus/impress.desktop
+@@ -30,7 +30,7 @@
+ X-GIO-NoFuse=true
+ Keywords=Slideshow;Slides;OpenDocument Presentation;Microsoft PowerPoint;Microsoft Works;OpenOffice Impress;odp;ppt;pptx;
+ InitialPreference=5
+-StartupWMClass=libreoffice-impress
++StartupWMClass=kanokoffice-impress
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ Actions=NewDocument;
+--- a/sysui/desktop/menus/math.desktop
++++ b/sysui/desktop/menus/math.desktop
+@@ -31,7 +31,7 @@
+ X-GIO-NoFuse=true
+ Keywords=Equation;OpenDocument Formula;Formula;odf;MathML;
+ InitialPreference=5
+-StartupWMClass=libreoffice-math
++StartupWMClass=kanokoffice-math
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ Actions=NewDocument;
+--- a/sysui/desktop/menus/startcenter.desktop
++++ b/sysui/desktop/menus/startcenter.desktop
+@@ -29,7 +29,7 @@
+ Comment=Launch applications to create text documents, spreadsheets, presentations, drawings, formulas, and databases, or open recently used documents.
+ StartupNotify=true
+ X-GIO-NoFuse=true
+-StartupWMClass=libreoffice-startcenter
++StartupWMClass=kanokoffice-startcenter
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ ##Define Actions
+--- a/sysui/desktop/menus/writer.desktop
++++ b/sysui/desktop/menus/writer.desktop
+@@ -30,7 +30,7 @@
+ X-GIO-NoFuse=true
+ Keywords=Text;Letter;Fax;Document;OpenDocument Text;Microsoft Word;Microsoft Works;Lotus WordPro;OpenOffice Writer;CV;odt;doc;docx;rtf;
+ InitialPreference=5
+-StartupWMClass=libreoffice-writer
++StartupWMClass=kanokoffice-writer
+ X-KDE-Protocols=file,http,webdav,webdavs
+ 
+ Actions=NewDocument;
+--- a/sysui/desktop/share/create_mime_xml.pl
++++ b/sysui/desktop/share/create_mime_xml.pl
+@@ -19,7 +19,12 @@
+ 
+ use File::Basename;
+ $basedir = dirname($0);
+-$productname = 'LibreOffice';
++$productname = 'KanokOffice';
++# KanokOffice: hicolor mimetype icons are installed as <iconprefix>-<Icon> (see sysui CustomTarget_share.mk);
++# naming them in the mime XML makes file managers show our icons instead of the desktop theme's.
++# Must follow PKGVERSIONSHORT when the base version changes.
++$iconprefix = 'kanokoffice26.8';
++$icondir = $basedir.'/../icons/hicolor/48x48/mimetypes';
+ $mimedir = $basedir.'/../mimetypes';
+ 
+ $FS= ' ';       # field separator (space) - for documents.ulf
+@@ -61,6 +66,7 @@
+     print '  <mime-type type="'.$mimetype.'">';
+     print (sort({customsort($a) cmp customsort($b)} @{$mimehash{$component}}));
+     print '    <glob pattern="'.$glob.'"/>';
++    print '    <icon name="'.$iconprefix.'-'.$icon.'"/>' if ($icon ne "" && -e $icondir.'/'.$icon.'.png');
+     if ( $component =~ /oasis/ ) {
+         if ( $component =~ /flat-xml/ ) {
+             print '    <sub-class-of type="application/xml"/>';
+@@ -99,6 +105,7 @@
+     $desktop_file = $mimedir.'/'.$desktop_name.'.desktop';
+     $mimetype = "";
+     $glob = "";
++    $icon = "";
+     open(DESKTOP_FILE, $desktop_file) || die "Cannot open desktop-file $desktop_file. ".$!;
+     while (<DESKTOP_FILE>) {
+         ## get mimetype
+@@ -106,6 +113,11 @@
+             s/^MimeType=(.*)\n$/$1/;
+             $mimetype = "$_";
+         }
++        ## get icon
++        if (/^Icon=/) {
++            s/^Icon=(.*)\n$/$1/;
++            $icon = "$_";
++        }
+         ## get glob
+         if (/^Patterns=/) {
+             s/^Patterns=(.*)\n$/\1/;
+--- a/sysui/desktop/share/create_tree.sh
++++ b/sysui/desktop/share/create_tree.sh
+@@ -39,14 +39,16 @@
+ #this symlink is needed to have the API bootstrap functions running right
+ ln -sf "${office_root}/program/soffice" "${DESTDIR}/${BINDIR}/${PREFIX}"
+ 
+-if test "${PREFIX}" != libreoffice${PRODUCTVERSION} -a "${PREFIX}" != libreofficedev${PRODUCTVERSION}  ; then
++# KanokOffice: installs into /opt/${PREFIX} itself, so no compat links to libreoffice${PRODUCTVERSION}
++# (they would replace the real install dir and collide with a real LibreOffice on the same machine)
++if false ; then
+     # compat symlinks
+     mkdir -p "${DESTDIR}${office_prefix}"
+     ln -sf libreoffice${PRODUCTVERSION} "${DESTDIR}${office_root}"
+     ln -sf /${BINDIR}/${PREFIX} "${DESTDIR}/${BINDIR}/libreoffice${PRODUCTVERSION}"
+ fi
+ 
+-test "${PREFIX}" = libreofficedev${PRODUCTVERSION} && mime_def_file="libreofficedev${PRODUCTVERSION}.xml" || mime_def_file="libreoffice${PRODUCTVERSION}.xml"
++mime_def_file="${PREFIX}.xml"
+ mkdir -p "${DESTDIR}/${PREFIXDIR}/share/mime/packages"
+ cp openoffice.org.xml "${DESTDIR}/${PREFIXDIR}/share/mime/packages/$mime_def_file"
+ chmod 0644 "${DESTDIR}/${PREFIXDIR}/share/mime/packages/$mime_def_file"
+--- a/sysui/Package_share.mk
++++ b/sysui/Package_share.mk
+@@ -7,7 +7,7 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ #
+ 
+-$(eval $(call gb_Package_Package,sysui_share,$(share_WORKDIR)/libreoffice))
++$(eval $(call gb_Package_Package,sysui_share,$(share_WORKDIR)/kanokoffice))
+ 
+ $(eval $(call gb_Package_add_files,sysui_share,share/xdg,\
+ 	$(addsuffix .desktop,$(LAUNCHERLIST)) \
+--- a/sysui/productlist.mk
++++ b/sysui/productlist.mk
+@@ -7,12 +7,12 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ #
+ 
+-PRODUCTLIST := libreoffice libreofficedev
++PRODUCTLIST := kanokoffice libreofficedev
+ PKGVERSION := $(LIBO_VERSION_MAJOR).$(LIBO_VERSION_MINOR).$(LIBO_VERSION_MICRO)
+ PKGVERSIONSHORT := $(LIBO_VERSION_MAJOR).$(LIBO_VERSION_MINOR)
+-PRODUCTNAME.libreoffice := LibreOffice
++PRODUCTNAME.kanokoffice := KanokOffice
+ PRODUCTNAME.libreofficedev := LibreOfficeDev
+-UNIXFILENAME.libreoffice := libreoffice$(PKGVERSIONSHORT)
++UNIXFILENAME.kanokoffice := kanokoffice$(PKGVERSIONSHORT)
+ UNIXFILENAME.libreofficedev := libreofficedev$(PKGVERSIONSHORT)
+ 
+ # vim: set noet sw=4 ts=4:
+--- a/translations/source/th/officecfg/registry/data/org/openoffice/Office/UI.po
++++ b/translations/source/th/officecfg/registry/data/org/openoffice/Office/UI.po
+@@ -25395,8 +25395,8 @@
+ "..GenericCommands.UserInterface.Commands..uno:Donation\n"
+ "Label\n"
+ "value.text"
+-msgid "Donate to LibreOffice"
+-msgstr "ร่วมสมทบทุนให้ LibreOffice"
++msgid "Support KanokOffice"
++msgstr "สนับสนุนกนก ออฟฟิศ"
+ 
+ #. yeHyu
+ #: GenericCommands.xcu
+--- a/translations/source/th/scp2/source/ooo.po
++++ b/translations/source/th/scp2/source/ooo.po
+@@ -49,8 +49,8 @@
+ "folderitem_ooo.ulf\n"
+ "STR_FI_TOOLTIP_SOFFICE\n"
+ "LngText.text"
+-msgid "LibreOffice, the office productivity suite provided by The Document Foundation. See https://www.documentfoundation.org"
+-msgstr "LibreOffice ชุดโปรแกรมสำนักงานซึ่งจัดเตรียมโดย The Document Foundation ดูเพิ่มเติมที่ https://www.documentfoundation.org"
++msgid "KanokOffice, an office suite based on LibreOffice. See https://kanokoffice.com/"
++msgstr "กนก ออฟฟิศ (KanokOffice) ชุดโปรแกรมสำนักงานที่พัฒนาต่อจาก LibreOffice ดูเพิ่มเติมที่ https://kanokoffice.com/"
+ 
+ #. Bf97K
+ #: module_helppack.ulf
+@@ -5539,5 +5539,5 @@
+ "registryitem_ooo.ulf\n"
+ "STR_REG_VAL_APPCAPABILITY_DESCRIPTION_OOO\n"
+ "LngText.text"
+-msgid "LibreOffice"
+-msgstr "LibreOffice"
++msgid "KanokOffice"
++msgstr "กนก ออฟฟิศ"
+--- a/vcl/source/app/IconHelper.cxx
++++ b/vcl/source/app/IconHelper.cxx
+@@ -14,22 +14,25 @@
+ 
+ OUString IconHelper::GetAppIconName(sal_uInt16 nIcon)
+ {
++    // KanokOffice: names of the hicolor icons our packages install (kanokoffice<ver>-<app>);
++    // the upstream "libreoffice-*" names would pull LibreOffice icons from the desktop theme.
++    // Must follow PKGVERSIONSHORT when the base version changes.
+     switch (nIcon)
+     {
+         case SV_ICON_ID_TEXT:
+-            return u"libreoffice-writer"_ustr;
++            return u"kanokoffice26.8-writer"_ustr;
+         case SV_ICON_ID_SPREADSHEET:
+-            return u"libreoffice-calc"_ustr;
++            return u"kanokoffice26.8-calc"_ustr;
+         case SV_ICON_ID_DRAWING:
+-            return u"libreoffice-draw"_ustr;
++            return u"kanokoffice26.8-draw"_ustr;
+         case SV_ICON_ID_PRESENTATION:
+-            return u"libreoffice-impress"_ustr;
++            return u"kanokoffice26.8-impress"_ustr;
+         case SV_ICON_ID_DATABASE:
+-            return u"libreoffice-base"_ustr;
++            return u"kanokoffice26.8-base"_ustr;
+         case SV_ICON_ID_FORMULA:
+-            return u"libreoffice-math"_ustr;
++            return u"kanokoffice26.8-math"_ustr;
+         default:
+-            return u"libreoffice-startcenter"_ustr;
++            return u"kanokoffice26.8-startcenter"_ustr;
+     }
+ }
+ 
