@@ -66,6 +66,9 @@ check("font TH SarabunPSK (4 styles)", len(styles), 4)
 # Python macros through the script framework (the bundled Windows Python ships without pip/setuptools)
 # (not Hidden: HelloWorldPython writes into the desktop's current component, which a hidden document never is)
 d = desk.loadComponentFromURL("private:factory/swriter", "_blank", 0, ())
+# headless on Windows a new document is not the current component until its frame is activated (the macro
+# then had no document to write into: "Hello World" missing, no exception)
+d.getCurrentController().getFrame().activate()
 try:
     d.getScriptProvider().getScript("vnd.sun.star.script:HelloWorld.py$HelloWorldPython?language=Python&location=share").invoke((), (), ())
     check("Python macro HelloWorldPython", "Hello World (in Python)" in d.Text.String, True)
