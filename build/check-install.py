@@ -2,6 +2,9 @@
 # and checks the Thai defaults, default templates, bundled extensions and font from the kanok module.
 # Usage: <office python> check-install.py <pipe-name>   · exit 0 = all checks passed, 3 = a check failed
 import sys, time
+# Windows: stdout to a pipe is cp1252 and cannot print the Thai labels (install-test of run 40314685672 stopped
+# at check 4 with UnicodeEncodeError); escape what the console encoding cannot show instead of failing
+sys.stdout.reconfigure(errors="backslashreplace")
 import uno
 from com.sun.star.beans import PropertyValue
 
