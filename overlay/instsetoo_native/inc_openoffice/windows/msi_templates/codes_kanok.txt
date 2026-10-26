@@ -1,4 +1,4 @@
-# Kanok Office — ProductCode/UpgradeCode ใหม่ทั้งหมด (สุ่ม uuid4 · codex 2026-10-21)
+# Kanok Office — ProductCode/UpgradeCode ใหม่ทั้งหมด (สุ่ม uuid4 · 2026-10-21)
 # ห้ามใช้รหัสของ LibreOffice: Windows จะถือว่าเป็นโปรแกรมเดียวกันและถอนของผู้ใช้ทิ้ง
 [PRODUCTCODE]
 ar = "{FC97FB6E-5CE8-470D-B849-C733240647AE}"
