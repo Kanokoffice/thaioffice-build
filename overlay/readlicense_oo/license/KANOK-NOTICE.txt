@@ -1,0 +1,10 @@
+﻿กนก ออฟฟิศ (Kanok Office) — ที่มาและสัญญาอนุญาต / Origin and licenses
+
+กนก ออฟฟิศ พัฒนาต่อจาก LibreOffice โดย บริษัท เอ็นเอแอลแอลทีซี จำกัด
+กนก ออฟฟิศ ไม่ใช่ผลิตภัณฑ์ของ The Document Foundation และไม่ได้รับการรับรองจาก The Document Foundation · "LibreOffice" เป็นเครื่องหมายการค้าของ The Document Foundation
+ซอร์สโค้ดส่วนที่อยู่ภายใต้ Mozilla Public License 2.0 ดาวน์โหลดได้ฟรีที่ https://kanokoffice.com/source
+ดูสัญญาอนุญาตและรายชื่อผู้ร่วมพัฒนาทั้งหมดได้ที่ "ข้อมูลสัญญาอนุญาต" ในเมนูวิธีใช้
+
+Kanok Office is based on LibreOffice and is made by NALLTC Limited.
+Kanok Office is not a product of, nor endorsed by, The Document Foundation. "LibreOffice" is a trademark of The Document Foundation.
+Source code for the parts covered by the Mozilla Public License 2.0 is available free of charge at https://kanokoffice.com/source.

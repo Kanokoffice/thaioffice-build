@@ -1,6 +1,6 @@
 # KanokOffice — Windows x64 MSI from the upstream LibreOffice 26.8.1.1 release tarballs + our patches.
 #
-# Manual only (no push trigger): every run costs Actions minutes (Windows x2) in this private repo.
+# Manual only (no push trigger): a full build takes about three hours of runner time.
 #   mode=probe  : print runner hardware and disk, ~2 min
 #   mode=build  : full build. If the 6 h job limit is near, make is stopped and the compiler cache
 #                 is saved, so the next build run resumes from cached objects.
