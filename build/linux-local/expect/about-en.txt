@@ -1,0 +1,3 @@
+Kanok Office is based on LibreOffice and is made by NALLTC Limited.
+Kanok Office is not a product of, nor endorsed by, The Document Foundation. "LibreOffice" is a trademark of The Document Foundation.
+Source code for the parts covered by the Mozilla Public License 2.0 is available free of charge at https://kanokoffice.com/source.

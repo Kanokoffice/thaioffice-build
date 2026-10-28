@@ -1,6 +1,6 @@
 # thaioffice-build
 
-Build repository for the Windows installer (MSI) of KanokOffice 26.8.1.1 (based on LibreOffice 26.8.1.1).
+Build repository for the Windows installer (MSI) and the Linux packages (.deb) of KanokOffice 26.8.1.1 (based on LibreOffice 26.8.1.1).
 
 | Path | Contents |
 |---|---|
@@ -11,6 +11,7 @@ Build repository for the Windows installer (MSI) of KanokOffice 26.8.1.1 (based 
 | `build/make-license-rtf.py` | Builds `overlay/setup_native/source/packinfo/license_{en-US,th}.rtf` from it |
 | `build/check-install.py` | Checks run against an installed office (install test) |
 | `build/windows-local/` | Scripts of the local Windows build (VS Community 2022) that produced the release MSI |
+| `build/linux-local/` | Configure options and scripts of the Linux build (Ubuntu 24.04 container) that produced the release .deb tarball, with its install test |
 | `patches/` + `patches/series` | Our changes to LibreOffice files (`patch -p1`, in order) |
 | `overlay/` | Files replaced or added whole (icons, MSI codes file, license page RTF, KANOK-NOTICE.txt). Copy with `cp -a --remove-destination` |
 | `branding/` | Images for `--with-branding` |

@@ -1,0 +1,22 @@
+# KanokOffice Linux x86-64 (.deb) configure options of release v26.8.1.1-kanok1 — one option per line,
+# '#' starts a comment line. @JOBS@, @EXT_TAR@ and @BRANDING@ are replaced by 20-build.sh.
+--with-lang=en-US th
+--enable-epm
+--with-package-format=deb
+--enable-mpl-subset
+--disable-poppler
+--disable-postgresql-sdbc
+--disable-report-builder
+--disable-lotuswordpro
+--disable-lpsolve
+--with-theme=colibre colibre_dark
+--without-java
+--without-help
+--without-doxygen
+--disable-online-update
+--enable-release-build
+--with-product-name=KanokOffice
+--with-vendor=NALLTC Limited
+--with-parallelism=@JOBS@
+--with-external-tar=@EXT_TAR@
+--with-branding=@BRANDING@
